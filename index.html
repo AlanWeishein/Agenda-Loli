@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda Personal - Salud y Tareas</title>
+    <style>
+        :root { --primary: #ff6b81; --secondary: #4a90e2; --bg: #f4f7f6; --text: #333; }
+        body { font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 20px; }
+        .container { background: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 450px; }
+        
+        /* Navegación por pestañas */
+        .tabs { display: flex; justify-content: space-around; margin-bottom: 20px; border-bottom: 2px solid #eee; }
+        .tab-btn { border: none; background: none; padding: 10px; cursor: pointer; font-weight: bold; color: #888; font-size: 0.9rem; }
+        .tab-btn.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+
+        .section { display: none; animation: fadeIn 0.3s; }
+        .section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Formularios */
+        .input-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        input { padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 1rem; }
+        button.add-btn { background: var(--secondary); color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button.add-btn:hover { opacity: 0.9; }
+
+        /* Listas */
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #f0f0f0; background: #fff; border-radius: 8px; margin-bottom: 5px; }
+        .actions { display: flex; gap: 5px; }
+        .actions button { border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        
+        /* Estados */
+        .done { text-decoration: line-through; color: #aaa; background: #f9f9f9; }
+        .failed { border-left: 5px solid #ff4757; background: #fff5f5; }
+        .delete-btn { background: #fee; color: #ff4757; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="tabs">
+        <button class="tab-btn active" onclick="showTab('tasks')">DIARIO</button>
+        <button class="tab-btn" onclick="showTab('cycle')">CICLO</button>
+        <button class="tab-btn" onclick="showTab('dates')">FECHAS</button>
+    </div>
+
+    <div id="tasks" class="section active">
+        <h3>📝 Mis Tareas</h3>
+        <div class="input-group">
+            <input type="text" id="taskInput" placeholder="¿Qué tienes pendiente?">
+            <button class="add-btn" onclick="addItem('tasks')">Anotar</button>
+        </div>
+        <div id="tasksList"></div>
+    </div>
+
+    <div id="cycle" class="section">
+        <h3>🩸 Ciclo Menstrual</h3>
+        <div class="input-group">
+            <label>Fecha de inicio:</label>
+            <input type="date" id="cycleInput">
+            <button class="add-btn" style="background: var(--primary)" onclick="addItem('cycle')">Guardar Registro</button>
+        </div>
+        <div id="cycleList"></div>
+    </div>
+
+    <div id="dates" class="section">
+        <h3>🔔 Fechas Importantes</h3>
+        <div class="input-group">
+            <input type="text" id="dateName" placeholder="Evento (Ej: Cumpleaños)">
+            <input type="date" id="dateDay">
+            <button class="add-btn" onclick="addItem('dates')">Crear Recordatorio</button>
+        </div>
+        <div id="datesList"></div>
+    </div>
+</div>
+
+<script>
+    // BASE DE DATOS (Requerimiento 2)
+    const DB_NAME = "AgendaLoli_DB";
+    let db = JSON.parse(localStorage.getItem(DB_NAME)) || { tasks: [], cycle: [], dates: [] };
+
+    function save() { localStorage.setItem(DB_NAME, JSON.stringify(db)); }
+
+    function showTab(id) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    function addItem(type) {
+        let item = { id: Date.now(), status: "" };
+        if (type === 'tasks') {
+            const input = document.getElementById('taskInput');
+            if (!input.value) return;
+            item.text = input.value;
+            input.value = "";
+        } else if (type === 'cycle') {
+            const input = document.getElementById('cycleInput');
+            if (!input.value) return;
+            item.text = "Inicio: " + input.value;
+        } else if (type === 'dates') {
+            const name = document.getElementById('dateName');
+            const day = document.getElementById('dateDay');
+            if (!name.value || !day.value) return;
+            item.text = name.value + " (" + day.value + ")";
+            name.value = ""; day.value = "";
+        }
+        db[type].push(item);
+        save();
+        render(type, item);
+    }
+
+    function render(type, data) {
+        const list = document.getElementById(type + 'List');
+        const div = document.createElement('div');
+        div.className = "list-item " + (data.status || "");
+        div.id = data.id;
+        
+        let actions = `<div class="actions">`;
+        if (type === 'tasks') {
+            actions += `<button style="color:green" onclick="update('${data.id}','done')">✓</button>`;
+            actions += `<button style="color:orange" onclick="update('${data.id}','failed')">X</button>`;
+        }
+        actions += `<button class="delete-btn" onclick="remove('${type}','${data.id}')">🗑️</button></div>`;
+        
+        div.innerHTML = `<span>${data.text}</span>` + actions;
+        list.appendChild(div);
+    }
+
+    function update(id, status) {
+        const t = db.tasks.find(x => x.id == id);
+        t.status = (t.status === status) ? "" : status;
+        save();
+        location.reload(); // Refresca para aplicar cambios visuales
+    }
+
+    function remove(type, id) {
+        db[type] = db[type].filter(x => x.id != id);
+        save();
+        document.getElementById(id).remove();
+    }
+
+    // Cargar datos al iniciar
+    window.onload = () => {
+        Object.keys(db).forEach(type => db[type].forEach(item => render(type, item)));
+    };
+</script>
+
+</body>
+</html>
